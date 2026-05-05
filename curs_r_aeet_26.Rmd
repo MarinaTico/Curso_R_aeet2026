@@ -1,0 +1,314 @@
+---
+title: "Curso_R_AEET_26"
+author: "Marina Ticó"
+date: "2026-05-04"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+###### Data management
+
+#Formato Tidy data
+
+Cada columna una variable, cada fila una observación y cada celda un
+valor.
+
+```{r}
+install.packages(c("tidyverse", 
+                   "here", # sirve para los paquetes. referir la ruta siempre al proyecto. Util cuando trabajas con mas gente o ordenadores diferentes 
+                   "tidylog", #ver que hacemos en cada función. Te va a decir lo que ha hecho cada funcion con tu dataset
+                   "summarytools"))  
+
+library(readr)      # leer archivos. bastante mejor que el base. 
+library(readxl)     # leer archivos excel
+library(dplyr)      # manejar datos
+library(tidyr)      # ordenar y trasformar datasets 
+library(stringr)    # manejar caracteres
+library(forcats)    # manejar factores
+library(lubridate)  # manejar fechas
+
+#Cargamos datos
+
+dt_raw <- read_csv(here("datasets/individual_seed_production.csv")) #con here llamo a mi proyecto
+
+glimpse(dt_raw) #veo como son mis datos
+head(dt_raw)
+
+```
+
+Modificaciones de nuestro dataset. Para poner el %\>%, hay que hacer
+shift + cntrl + m
+
+```{r}
+#arrange ordena
+dt_raw %>% arrange(desc(count)) #ORDENO POR COUNT DE mayor a menor
+
+dt_raw %>% arrange(site_name, count) #ordeno primero por site y despues por count de mayor a menor. ESTO ES UTIL PARA MI DATASETPHYLOALPS
+
+#rename: 
+dt_raw %>% rename(site = site_name, species = species_name)
+
+#relocate
+
+dt_raw %>% relocate(count, .after = site_name) #before o after #como no nombro el objeto no se han cambiado los nombres
+
+#select: junta un poco todo. selecciona el numero de variables que tenemos 
+dt_raw %>% select(site = site_name, count, species = species_name)
+  #> dt_raw %>% select(site = site_name, count, species = species_name)
+#select: renamed 2 variables (site, species) and dropped 11 variables (esta es la informacion que me da tidylog!!!!!!)
+
+#si queremos quitar variables a mi dataset
+dt_raw %>% select(!site_name) # ! es mas consistente por la sintaxis de tidyverse
+
+```
+
+Creamos el dataset nuevo y limpio
+
+```{r}
+
+dt <- dt_raw %>%  
+  select(site = site_name,
+         year,
+         species_name,
+         plant_ID,
+         count,
+         method = general_method,
+         stem_cm = stem_diameter_cm,
+         trap_area_m2)
+
+# resumen de mis datos
+
+dfSummary(dt) #puedes ver la distribucion de los datos, util para ver si queremos normalizar o esta normal ya
+dfSummary(dt$site)
+dfSummary(dt$stem_cm)
+View(dt) #majuscula!!! facil de filtrar y molt util per veure dades
+
+
+```
+
+#Funciones de dplyr (parte 2): distinct() - Extraer valores únicos
+mutate() - Crear nuevas variables filter() - Filtrar datos por casos\
+filter_out() - Permite mantener NAs importante group_by() - Agrupar
+datos por casos summarise() - Resumir datos por casos count() - Contar
+casos por variable
+
+```{r}
+dt %>% distinct(site, method) #me permite concatenar, combinar categorias 
+dt %>% mutate(fruits_m2 = count/trap_area_m2) #creo nueva variable, con operaciones entre variables
+dt %>% filter(count>0)
+dt %>% filter_out(count == 0) #nos quita los 0 pero no los NA
+dt %>% 
+  filter(site %in% c("AEC", "AND", "BNZ"))
+dt %>% filter(count > 0 & count <= 100) # & es el AND
+
+#!= es decir que esto no
+
+#Podemos filtrar tambien varaibles categoricas
+
+```
+
+Queremos agrupar y resumir datos
+
+```{r}
+dt %>% 
+  group_by(site) %>%  
+  summarise(fruits = sum(count, na.rm = TRUE))  #todas las funciones que queramos (mean etc)
+
+#grup_by mutate, va ha hacer los claculos por grupos.Nueva variable agregada por otra Et crea la columna
+
+tmp <- dt %>% 
+  group_by(site) %>% 
+  mutate(fruits_mean = mean(count, na.rm = TRUE))
+
+
+dt %>% filter_out(is.na(stem_cm)) %>% distinct(species_name)
+#si quiero el numero de casos uso count
+
+dt %>% filter_out(is.na(stem_cm)) %>% count(species_name)
+
+# Queremos contar el numero de filas x sitio y por metodo de muestreo 
+
+dt %>% count(site, method)
+
+dt %>% group_by(site, method) %>% summarise(n_casos = n()) #son dos metodologias que nos calculan lo mismo 
+
+dt %>% group_by(site, method) %>% summarise(n_casos = n(), n_species = n_distinct(species_name)) #n_sitinct nos da las especies difrentes, no un total de conteos si distinguir entre especies, sino nos daria lo mismo que el n de arriba. 
+
+
+```
+
+Funciones de dplyr (parte 3): if_else() - Corregir datos (se cumple o no
+se cumple) case_when() - Crear categorias (en base a varias reglas, no
+solo true o false como la ootra)
+
+se usan dentro de mutate o summarise
+
+```{r}
+
+dt_fit <- dt %>% 
+  mutate(count = if_else(count > 1000000, NA, count)) #si se cumple coloca un NA y sino lo mantiene a count
+
+
+dt %>% 
+  mutate(fruit_level = if_else(count > 100, "mucho", "poco")) #if_else muy util
+
+#case_when
+dt %>% 
+  mutate(fruit_level = if_else(count > 100, "mucho", "poco", missing = "nodata")) #if_else no borra nunca filas
+
+dt %>% 
+  mutate(fruit_level = case_when(
+    count > 100 ~ "mucho", 
+    count <= 100 & count >=100 ~"medio",
+    count < 100 ~"poco",
+    .default = "nodata"
+  )) #cuando los datos no cumplen ninguna de las categories, el argumento se llama default. .unmatched: cuando no se cumple ningiuna de las otras reglas 
+
+dt %>% 
+  mutate(nivel_frutos = case_when( 
+    count <= 100 ~ "bajo",
+    count > 100 & count <= 1000 ~ "medio",
+    count > 1000 ~ "alto")) %>%  
+  group_by(nivel_frutos) %>% 
+  summarise(trees = n()) #creo variable nueva que me cuente los individuos de arboles de cada una de las categorias 
+#me cuenta el numero de individuos ppor cada variaable
+
+dt %>% 
+  mutate(nivel_frutos = case_when( 
+    count <= 100 ~ "bajo",
+    count > 100 & count <= 1000 ~ "medio",
+    count > 1000 ~ "alto")) %>%  
+  group_by(nivel_frutos) %>% 
+  summarise(n_cases = n(),
+            n_sp = n_distinct(species_name)) #creo otra columna mas con el valor de especies diferentes 
+
+
+
+
+```
+
+# Reestructurar datos
+
+```{r}
+library(tidyr)
+
+#pivot_larger (a formato largo), pivot_wider (a formato ancho)
+
+dt_short <- dt %>% 
+  group_by(site, year) |> 
+  summarise(fruits = mean(count, na.rm. = TRUE)) %>%  
+  pivot_wider(names_from = "site",
+              values_from = "fruits") #las filas seran los años y las columnas el sitio names_from: nombres de las columnas nuevas, values_from: valores de las celdas 
+#al reves seria
+
+dt_short2 <- dt %>% 
+  group_by(site, year) |> 
+  summarise(fruits = mean(count, na.rm. = TRUE)) %>%  
+  pivot_wider(names_from = "year",
+              values_from = "fruits")
+
+View(dt_short)
+
+#ahora quiero transformarlo a formato largo (copiar del power)
+
+dt_short %>% 
+  pivot_longer(cols = c("1999" : "2021") , # or cols = -year,
+               names_to = "year",
+               values_to = "fruit_mean")
+dt_short |>
+  pivot_longer(cols = c(AEC:SEV), # or cols = -year,
+               names_to = "site",
+               values_to = "fruits") # esta sale todo bien
+
+```
+
+Combinar bases de datos
+
+```{r}
+
+sp_info <- read_csv(here("datasets/species_attributes.csv"))
+c()
+df_left <- dt %>% 
+  left_join(sp_info, by= c("species_name" = "species_name")) #left_join 
+
+df_full <- dt %>% 
+  full_join(sp_info, by= c("species_name" = "species_name"))
+
+
+df_inner <- dt %>% 
+  inner_join(sp_info, by= c("species_name" = "species_name")) #agafa el que tenen els dos
+
+##  inner_join Y full_join
+
+# set_diff
+sp_left <- distinct(df_left, species_name) 
+sp_full <- distinct(df_full, species_name) 
+sp_inner <- distinct(df_inner, species_name)
+
+setdiff(sp_full, sp_left)
+setdiff(sp_left, sp_inner)
+
+
+## DATA SET LIMPIO
+
+dt_info <- dt %>% 
+  left_join(sp_info)
+
+dt_clean <- dt_info %>% 
+  mutate (count = if_else(count > 1000000, NA, count)) %>% 
+  filter(count > 0) %>% #elimina las NAs y los 0
+  mutate(fruits_m2 = count/trap_area_m2) %>% 
+  mutate(fruits = if_else(is.na(fruits_m2), count, fruits_m2)) #cuando fruits_m2 es na nos pone la cantidad de individuos contados, sino es los fruits_m2
+
+write.csv(dt_clean, here("datasets/data_clean.csv")) # si nos da error provar con write.csv2
+  
+  
+```
+
+### EJERCICIO 1
+
+Usando la base de datos final (dt_clean), seleccionar datos con
+información para diámetro de tronco (stem_cm) y ordernar de mayor a
+menor:
+
+```{r}
+dt_clean %>% filter_out(is.na(stem_cm)) %>% 
+            arrange(desc(stem_cm))
+
+dt_clean %>% filter(!is.na(stem_cm)) %>% 
+  arrange(desc(stem_cm))
+```
+
+## EJERCICIO 2
+
+Usando la base de datos final (dt_clean), calcular diámetro medio y SD
+para cada especie de árbol.
+
+```{r}
+
+```
+
+#EJERCICIO 3
+
+Usando la base de datos final (dt_clean), calcular el número de árboles
+y número de especies mayores de 40cm de diámetro y menores de 40cm de
+diámetro. Debería salir algo asi:
+
+```{r}
+dt_clean %>% 
+  mutate(tree_size = if_else(stem_cm >40, "mayor", "menor", missing = "nodata")) %>% 
+  group_by(tree_size) %>% 
+  summarise(n_species = n_distinct(species_name), n_trees = n())
+
+dt_clean %>% 
+  mutate(tree_size = if_else(stem_cm >40, "mayor", "menor")) %>% 
+  group_by(tree_size) %>% #a partir de aqui todo se agrupa por tree_size
+  summarise(n_species = n_distinct(species_name), n_trees = n()) %>% 
+  filter_out(is.na(tree_size)) %>% 
+  ungroup() #desagrupamos, asi ya no seguimos con tree_size y podemos con otros
+  
+```
+
+################################################################################################################################

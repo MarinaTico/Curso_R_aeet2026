@@ -1,0 +1,253 @@
+---
+title: "ggplot"
+author: "Marina Ticó"
+date: "2026-05-04"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+install.packages(c("tidyverse", 
+                   "here", # sirve para los paquetes. referir la ruta siempre al proyecto. Util cuando trabajas con mas gente o ordenadores diferentes 
+                   "tidylog", #ver que hacemos en cada función. Te va a decir lo que ha hecho cada funcion con tu dataset
+                   "summarytools"))  
+
+library(readr)      # leer archivos. bastante mejor que el base. 
+library(readxl)     # leer archivos excel
+library(dplyr)      # manejar datos
+library(tidyr)      # ordenar y trasformar datasets 
+library(stringr)    # manejar caracteres
+library(forcats)    # manejar factores
+library(lubridate)  # manejar fechas
+library(here)
+library(ggplot2)
+
+#Cargamos datos
+
+dt_raw <- read_csv(here("datasets/individual_seed_production.csv")) #con here llamo a mi proyecto
+
+glimpse(dt_raw) #veo como son mis datos
+head(dt_raw)
+
+```
+
+######## GGPLOT
+
+CAPAS Data - dataset a graficar; necesita formato tidy data
+
+Aesthetics - describe cómo se asignan las variables del dataset (y sus
+escalas) a las propiedades visuales (x, y, size, colour, fill, group,
+sise, shape. . . ) #aes
+
+Geometries - determina la forma de representar los datos (geoms: points,
+lines, bars, boxplot. . . )
+
+Scales - maneja las escalas de los aesthetics (x & y format, colors
+continuous or discrete, sizes, shapes. . . )
+
+Facets - crea subplots (facet_wrap or facet_grid. . . )
+
+Themes - apariencia general del gráfico, no ligada a los datos (title,
+x.axis.text, legend. . . )
+
+Statistics - resume los datos con estadísticos. Muchas veces ya va
+implícito en el “geom” (stats: count, density, bins, means, density. . .
+)
+
+Coordinate system - determina el sistema de coordenadas a usar en los
+ejes (cartesian, polar, map projections. . . )
+
+Usaremos la base de datos dt_clean. Entender bien como funciona lo de
+aes dentro de ggplot o dentro de geompoint
+
+```{r}
+
+dt <- read.csv(here("datasets/data_clean.csv"))
+dt <- dt %>% 
+  select(-X)
+
+ggplot(dt) #no sabe que plotear
+
+ggplot(dt, aes(year, fruits)) #entiende que la primera es la x y la segunda es la y
+ggplot(dt, aes(year, fruits)) + #aqui te coloca los ejes
+  geom_point(colour = "blue") #aqui es cuando te pinta los datos, no simepre, en el caso de depender de una variable va en aes
+
+ggplot(dt, aes(year, fruits)) +
+  geom_point(aes(colour = growth_form)) +
+  geom_line() #color de la linia no tiene ninguna condicion
+
+ggplot(dt, aes(year, fruits), 
+       colour = growth_form) +
+  geom_point() +
+  geom_line() #color de la linia no tiene ninguna condicion
+
+# el color puede estar dentro del ggplot general o dentro del geompoint cambia
+
+ggplot(dt, 
+       aes(x = year, y = fruits)) +
+  geom_point(color = "coral",
+             shape = "triangle",
+             size = 4, 
+             alpha = 0.5) #sin el aes dentro, no van a estar relacionadas con ninguna variable. al no estar dentro de aes todos los puntos tienen la misma estetica
+
+
+#todo lo que no este en aes lo hace comun para todos los puntos
+
+
+```
+
+Hacemos un subset de datos. Solo nos quedamos con los datos de diametro
+
+```{r}
+dt_diam <- dt %>% 
+  filter(!is.na(stem_cm)) 
+
+# nos quedamos con muchos datos menos trabajamos mejor
+
+```
+
+Probamos:
+
+```{r}
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = stem_cm)) + # escala de color 
+  geom_point(shape = "triangle",
+             size = 4, 
+             alpha = 0.5) 
+
+#escala de color
+
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = stem_cm)) + 
+  geom_point()  +
+  scale_colour_continuous(high="red", low="yellow") # escala de color 
+
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = genus)) + 
+  geom_jitter(width=0.5)  +
+  scale_color_manual(values = c("green", "blue", "red", "yellow")) +
+  scale_x_continuous(limits = c(1955, 1970)) +
+  scale_y_continuous(breaks = c(100, 500, 700, 1000))
+
+
+
+ggplot(dt_diam, 
+       aes(x = year, y = log(fruits))) + 
+  geom_jitter(width=0.5) 
+  
+
+
+#Paletas para daltonicos
+
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = genus)) +
+  geom_point() +
+  scale_color_viridis_d()
+
+
+###Paletter paquetas disponibles, muchos recursos
+
+
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = genus,
+           size = stem_cm)) +
+  geom_point() +
+  scale_color_viridis_d(option = "magma")
+
+
+```
+
+#Facets
+
+Divide el plot en diferentes plots
+
+```{r}
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = genus)) +
+  geom_point() +
+  facet_wrap(species_name~genus, scales = "free") 
+
+```
+
+#geometria
+
+```{r}
+ggplot(dt_diam, 
+       aes(x = year, y = fruits, 
+           color = genus)) +
+  geom_point() +
+  geom_hline(yintercept = c(1000, 1300)) + #linea horizontal
+  geom_vline(xintercept = 1950) #linia vertical +
+  geom_smooth(method = "lm")
+  
+  
+ggplot(dt_diam, 
+       aes(stem_cm)) +
+  geom_histogram(binwidth = 1) #anchura de las columnas 
+
+ggplot(dt_diam, aes(stem_cm, fill = genus, colour = genus))+ #fill para que rellene y cree una curba para cada uno
+  geom_density(alpha=0.5)
+
+
+#grafico cajas steam en funcion de los generos
+ggplot(dt_diam, aes(x = genus, y = stem_cm, fill = genus))+
+  geom_boxplot(alpha = 0.5) +
+  geom_jitter (alpha = 0.5)
+
+ggplot(dt_diam, aes(x = genus, y = stem_cm, fill = genus))+
+  geom_violin() #se ajusta mejor la forma de la distribución
+
+```
+
+Barras
+
+```{r}
+
+```
+
+Temas
+
+theme(axis.text.x = element_text (angle =90)) esto es para poner en los ejes las etiquetas en vertical
+theme_set elegimos o creamos el tema para un mismo script!!!!
+
+
+PATCHWORK
+
+se nombran los plots i se suman divides y abajo aparece uno tambien !!!!!!
+se pueden dar a b y c para las figuras de los papers 
+
+
+ggsave! si exportamos directamente des de plots lo guarda con tamaños dependientes de lo que tengas tu en la consola
+ggsave en unidades y defines el tamaño. 
+
+ggally: comparacion entre diferentes variables. Para analisis aproximativos esta muy bien 
+
+
+##Ejercicio 3
+Alternativa 1 - Sacar primero la media y la SE del número de frutos y luego graficar
+
+```{r}
+dt %>% 
+  #remove outlier year
+  filter(!(site == "BNZ" & year == 1958)) %>% 
+  group_by(site, year) %>% 
+  summarise(mean_fruits = mean(fruits, na.rm = TRUE),
+            se_fruits = sd(fruits, na.rm = TRUE)/sqrt(n())) %>% 
+  ggplot(aes(x = year, y = mean_fruits)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_fruits - se_fruits,
+                    ymax = mean_fruits + se_fruits)) +
+  geom_line() + 
+  facet_wrap(~site, scales = "free") + 
+  theme_bw()
+
+```
