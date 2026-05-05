@@ -9,6 +9,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
+install.packages("tlmgr")
 library(here)
 library(nlme)
 library(tidyverse)
