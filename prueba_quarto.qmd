@@ -1,0 +1,33 @@
+---
+title: "Mi informe"
+format: typst
+author: "Marina Ticó Ancil"
+bibliography: references.bib
+---
+
+Mi informe del dataset Ticó et al. 2026
+
+referencia principal: [@wootton2025a]
+
+```{r}
+#|echo: FALSE
+#| message: FALSE
+#| warning: FALSE
+
+library(here)
+library(tidyverse)
+
+```
+
+```{r}
+dt <- read_csv(here("data/data_clean.csv"))
+```
+
+Para meter un poco de codigo en el texto lo pongo asi: la media es `r mean(dt$count, na.rm = TRUE)`
+
+```{r}
+#| fig-cap: "Figura 1: plot"
+#| echo: FALSE
+ggplot(dt, aes(y = count, x= year)) +
+  geom_point()
+```

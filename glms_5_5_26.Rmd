@@ -650,8 +650,118 @@ check_model(mixed)
 r2(mixed)
 ```
 Sitio es random, intercept que varia sobre una distribucion. El fijo es el dbh. La condicional tiene en cuenta el random, la marginal no. 
-sabemos que hay difreencias entre sitios, pero no sabemos porque (por eso random)
+sabemos que hay difreencias entre sitios, pero no sabemos porque (por eso random). POdriamos tener predictores a nivel de sitio, por ejemplo un gradiente de altitud o temperatura etc. 
+
+*predictores de sitio*
+  Metemos sitedata como predictores
+```{r}
+sitedata <-read.csv('datasets/sitedata.csv') 
+sitedata
+
+trees.full <- merge(trees, sitedata, by = 'site') 
+head(trees.full)
+
+group.pred <- lmer(height ~ dbh + (1 | site) + temp, data = trees.full)
+summary(group.pred)
+```
+ Como afecta la temperatura a la altura (esto se ve en los fixed effects). 
+ Misma pendiente (dbh).
+ 
+ *Varying intercepts and slopes*
+ 
+ Pendientes variables, en el caso de los lm lo vimos con las interacciones. 
+ A parte de tener un random intercept por sitio lo queremos con el dbh. 
+
 
 ```{r}
+mixed.slopes <- lmer(height ~ dbh + (1 + dbh | site), data=trees) 
+
+equatiomatic::extract_eq(mixed.slopes)
+
+summary(mixed.slopes)
+```
+Intercept para cada sitio y pendiente para cada sitio. 
+Hay correlacion fuerte: No hay apoye hacia pendientes variables entre sitios. 
+
+```{r}
+coef(mixed.slopes)
+```
+Vemos que hay diferentes pendientes, pero todas entorno a la general. 
+Podriamos quedarnos con el modelo anterior que es mas sencillo.
+Podria darse que si que hubiera ditintos pendientes. La pregunta tiene que tener sentido a priori
+
+
+#MULTILEVEL LOGISTIC REGRESSION
+
+Hablamos de mortalidad (binomial)
+
+```{r}
+logis2 <- glm(dead ~ dbh + site, data = trees, family=binomial)
+summary(logis2)
+```
+
+En el 9 i el 10 da cosas raras, porque en un modelo no mixto calcula de forma independiente cada sitio, i ene stos casos en el 9 y el 10 no hay ningun arbol muerto. No puede estimar el indice de mortalidad si todos estan vivos. Vamos a juntar los datos con un generalized y asi entendemos que pasa, teniendo en cuenta los otros sitios
+
+```{r}
+mixed.logis <- glmer(dead ~ dbh + (1|site), data=trees, family = binomial)
+summary(mixed.logis)
+
+#usamos tambien el family!!
+```
+el efecto del dbh es positivo, mas dbh, mas grandes, mas portalidad. La varianza entre sitios es tan pequeña que no lo puede cuantificar, hay pocos muertos! Con bayes se puede arreglar esto
+
+```{r}
+coef(mixed.logis)
+```
+Estima la misma mortalidad porque no ha podido calcular bien la varianza
+
+*Summary:*
+
+- Structured data (space-time): medidas repetidas en el tiempo, repetidos en el espacio
+- Comparte info en todo el dataset
+- El modelo mixto te protege de small sample size
+
+
+*Sintaxi:*
+
+x = predictor
+Podemos tener dos grupos: altura en distintos sitios y en distintos años
+Anidamientos. es mas facil a tener distintos grupos. 
+Podemos tener pendientes variables por cada uno de los grupos por cada predictor. Por ejempl dbh con una pendiente concreta or sitio o por especie. 
+
+
+*EJERCICIO*
+
+Starlings: body mass growth depending on nest type
+
+```{r}
+starl <- read.csv("datasets/starlings.csv")
+head(starl)
+```
+```{r}
+m1 <- lm(bodymass ~ roost, data = starl)
+summary(m1) #pero esta mal porque se mira el individuo en varios sitios
+
+m2 <- glmmTMB(bodymass ~ roost + (1 | subject), data=starl) 
+summary(m2)
+```
+Peso medio del interior es de 83. Diferencias muy leves muy inciertas
+Poca variacion entre sujetos una vez controlamos
+```{r}
+visreg(m1)
+visreg(m2)
+
+check_model(m2)
+```
+
+Mixed binom: species presence/absence ~environment
+
+```{r}
+binom <- read.csv("datasets/mixed_binom.csv")
+
+mixbinom <- glm(presabs ~ environment + species, data = binom, family=binomial)
+summary(mixbinom)
+
+coef(mixbinom)
 ```
 
