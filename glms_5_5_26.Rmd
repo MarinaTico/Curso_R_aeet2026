@@ -601,4 +601,57 @@ seedl.offset <- glm(count ~ light,
 
 # MODELOS MIXTOS
 
+Objetivo parecido a los modelos lineales: interecpts i pendientes variables 
+Nos permiten explotar mejor la informacion
+Estructura: 
+- site: en uno linear cada intercept se estima de forma independiente. No mira lo que pasa en el resto. En el modelo mixto estimamos los mismos parametros, pero se comparte información, se tiene en cuenta lo que pasa en el resto de sitios. El intercept de un sitio se ve influydo por el intercept en el resto de sitios
+
+Es una regresion dentro de una regresion. 
+se asume que el sitio tiene su propia regresion, donde se asume que se distribuien con una distribucion normal y una varianza residual dada tau elevado a 2. Miramos la desviacion de los sitios a partir de una media por sitios. 
+
+Los parametros se estiman compartiendo toda la información del dataset
+
+Gradiente: 
+- Complate pooling: single overall intercept or no pooling: estimamos un intercept para cada sitio de foma independiente
+- partial pooling (modelos mixtos). Inter related intercepts  lmer (heigh ~ dbh, (1|site)) un intercept para cada sitio i una unica pendiente para el dbh
+
+
+```{r}
+library('glmmTMB') 
+mixed <- glmmTMB(height ~ dbh + (1|site), data = trees)
+summary(mixed)
+```
+```{r}
+library(lme4)
+mixed <- lmer(height ~ dbh + (1|site), data = trees)
+summary(mixed)
+```
+
+
+Residual: es la que no se explica por el modelo general (la sigma). 
+La tau te mira como de diferente son los sitios entre si. 
+
+Lo de abajo son los efectos fijos: altura esperada en m cuando el diametro es 0 en un sitio promedio 
+Cuantifico como de diferentes son las alturas en los sitios y estimo la tau. Los valores de sitio, del intercept seran distribución normal alrrededor de 0. 
+
+```{r}
+coef(mixed)
+```
+Nos ha calculado los intercepts de todos los sitios mezclando información. 
+En el modelo lineal hay mas desviación, porque miras exclusivamente el sample size y la info del sitio en concreto sin tener en cuenta el resto. 
+se disminuyen los sesgos del azar
+
+STATISTICALLY THINKING
+
+el default deveria de ser modelo mixto. Con pocos sitios es dificil sacar un patron comun, por lo que podria volver a un modelo linear simple. Si quieres predecir mas alla de tus parcelas es problematico en funcion de la tau. 
+
+```{r}
+check_model(mixed)
+r2(mixed)
+```
+Sitio es random, intercept que varia sobre una distribucion. El fijo es el dbh. La condicional tiene en cuenta el random, la marginal no. 
+sabemos que hay difreencias entre sitios, pero no sabemos porque (por eso random)
+
+```{r}
+```
 
