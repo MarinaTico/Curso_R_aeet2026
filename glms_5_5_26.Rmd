@@ -383,7 +383,7 @@ Trabajamos con variables que no tienen distribucion normal!
     que tengamos
 
 - Gausian: identical a la de siempre
-- Binomial: funcion logit. Los parametros vendran en esta escala. Para
+- Binomial: funcion #logit. Los parametros vendran en esta escala. Para
   interpretarlas hay que hacer la transformacion inversa del logit.
 
 Formula del modelo titanic correcta
@@ -394,3 +394,211 @@ tit.glm <- glm(survived ~ class,
                family = binomial)
 summary(tit.glm)
 ```
+Los residuos y no tienen que ser normales. 
+Intercept: representa a la crew. Probabilidades de supervivencia en escala logit. Hay que transformarlo con el inverso del logit. 
+NULL DEVIANCE: devianca nula donde no hay predictor, solo intercept. En este solo gastamos un grado de libertad.
+Residual deviance: el del modelo con predictores. Grados de libertad menos porque tenemos más predictores.
+
+Transformamos el LOGIT a probabilidades: 
+
+```{r}
+library("easystats")
+estimate_means(tit.glm)
+```
+Añadimos la funcion de enlace logit para poder hacer el glm, posteriormente cambiamos.
+
+Podemos calcular la r2 del modelo con otra funcion
+```{r}
+r2(tit.glm) #vemos que hay  mucha varianza en la supervivencia que no se explica
+```
+```{r}
+check_model(tit.glm)
+```
+Binned residuals: puede que salgan puntos que no entran en los resultados esperados, no es preocupante. 
+
+```{r}
+library(DHARMa)
+simulateResiduals(tit.glm, plot = TRUE)
+# pODEMOS COMPROBAR COMO DE bueno es el modelo
+```
+WORKFLOW
+- Visualise data
+- fit model glm: specify family
+- examine model: summary 
+- Back-transform parameters
+- Plot and check models
+
+
+# Ejercicio
+
+```{r}
+# Did man have higher survival than woman
+
+tit.glm2 <- glm(survived ~ sex, 
+               data = titanic,
+               family = binomial)
+summary(tit.glm2)
+
+# Transformamos los datos
+
+estimate_means(tit.glm2)
+```
+Concluimos que las mujeres tubieron mayor supervivencia que los hombres.
+
+Ploteamos
+
+```{r}
+r2(tit.glm2) #0.2 
+check_model(tit.glm2)
+```
+
+Ahora queremos saber el efecto de ser mujer vs el efecto de la classe ante la supervivencia
+añadimos interaccion
+
+```{r}
+tit.glm3 <- glm(survived ~ sex*class, 
+               data = titanic,
+               family = binomial)
+summary(tit.glm3)
+#el efecto de la clase en funcion del sexo
+
+#transformamos 
+
+estimate_means(tit.glm3)
+```
+Pocas mujeres en crew por esto intervalo grande. Existe el efecto de clase, pero hay un claro efecto del sexo. 
+con este modelo podemos desagregar los efectos.
+Ploteamos:
+
+```{r}
+visreg(tit.glm3,scale= 'response',rug=FALSE)
+
+```
+
+# Logistic regression for proportion data
+Datos de proporciones
+Cuando tenemos proporciones: SE desconoce el tamaño de muestreo, LAS PROPORCIONES SERAN IGUALES. se pierde el sample size.
+Para que no pase, modelizaremos el conteo. 
+
+```{r}
+surv <- readr::read_csv(here('data/survival_expt.csv'))
+head(surv)
+```
+Resultado: (que no tenemos la base de datos)
+
+surv.glm <- glm(cbind(Survived, Died) ~ Stress, data = surv, family = binomial) 
+
+Call: glm(formula = cbind(Survived, Died) ~ Stress, family = binomial, data = surv) 
+
+Coefficients: Estimate Std. Error z value Pr(>|z|) 
+(Intercept)-0.54005 0.09805-5.508 3.64e-08 *** 
+Stress 1.23403 0.19079 6.468 9.92e-11 ***--
+Signif. codes: 0 ’***’ 0.001 ’**’ 0.01 ’*’ 0.05 ’.’ 0.1 ’ ’ 1 
+(Dispersion parameter for binomial family taken to be 1) 
+Null deviance: 323.54 on 49 degrees of freedom 
+Residual deviance: 277.29 on 48 degrees of freedom 
+AIC: 354.05 302 
+Number of Fisher Scoring iterations: 4
+
+
+
+Tendre dos variables respuesta: la primera sera lo que modelizes. De esta forma tendra en cuenta el sample size!!
+Intercept en este caso es la probabilidad de supervivencia en escala logit en situaciones de estres 0. 
+Si cambiamos el orden calculariamos la probabilidad de mortalidad. 
+A mayor estres mayor supervivencia en este caso.
+
+Haciendo el check model nos da cosas raras, no lo damos por bueno. con un simulate residuals nos pasa lo mismo
+
+```{r}
+check_overdispersion(surv.glm) #nos da significativo en este caso
+```
+
+
+Tenemos un problema de *sobredispersión*: hay mas variación de la que la distribución de los datos asume
+Formas de solucionarlo: 
+- Cambio de family binomial a family *quasibinomial* Quantifica el exceso de varianza y cambia los resultados del modelo. Este hecho cambia las incertidumbres, crecen los errores estandard. Efectos significativos si lo corregimos pueden dejar de serlo 
+
+```{r}
+glm(formula = cbind(Survived, Died) ~ Stress, family = quasibinomial, data = surv)
+```
+
+Se puede corregir de varias formas. 
+
+
+#GLM FOR COUNT DATA: POISSON REGRESSION
+
+La variable respuesta no es normal ni binaria. Son de conteo. Variable numerica pero discreta. Los residuos no nos saldran bien, usamos datos de conteo. La transformacion es *logaritmica*. 
+Los parametros en el summary estaran en logaritmo, para obtener los datos habra que transformar.
+
+```{r}
+seedl <- read.csv("datasets/seedlings.csv")
+#abundancia de plantas en funcion de la luz por cada parcela 
+hist(seedl$count)
+```
+Primero hay que plantear la pregunta ecologica! 
+```{r}
+seedl.glm <- glm(count~light,
+                 data = seedl,
+                 family = poisson)
+summary(seedl.glm)
+```
+Intercept: en total oscuridad, el logaritmo del total de plantas. 
+Pendiente es incierta y no significativa, asi que es complicado aberiguar que efecto tiene la luz sobre el numero de plantas. 
+combertir los datos (algo puedo intuir, pero es ,mejor).
+Copiar datos del powerpoint. 
+
+```{r}
+#estimate_means solo funciona con variables categoricas
+
+library('easystats') 
+parameters(seedl.glm)
+
+estimate_relation(seedl.glm)
+```
+vemos que a mas luz disminuyen las plantas
+
+```{r}
+r2(seedl.glm) #la luz parece no indicarnos mucho
+```
+*assumptions poisson*
+• Linearity (log response ~ predictors) 
+• Observations are independent 
+• Mean = Variance
+
+Muy frequentemente podemos encontrar sobredispersión!!!!!
+Como resolvemos:
+Primero testeamos:
+```{r}
+
+```
+
+Soluciones: 
+
+Pasamos de family poisson a family *quasipoisson*. Las estimas no cambian pero se agrandan los errores estandard. 
+Podemos cambiar de distribución a *negative binomial distribution*
+Include observation level random effect.
+
+```{r}
+
+```
+Copiar datos!
+
+*que pasa si las parcelas tienen diferentes superficies?*
+Cuidado con usar ratios como variable respuesta. No esta bien. Nos cargamos el conteo. 
+Te condiciona negativamente las estimas del modelo. 
+offset! Lo pondremos como logaritmo
+
+```{r}
+seedl.offset <- glm(count ~ light, 
+                    offset = log(area), 
+                    data = seedl, 
+                    family = poisson)
+
+#tendra que estar en logaritmo porque la variable respuesta esta en logaritmo (en el caso de family poisson). Para que sea proporcional el resultado. Añadimos el area como un predictor mas, al decir offset la pendiente de est factor es la misma. 
+#Con diferentes muestreos
+```
+
+
+# MODELOS MIXTOS
+
+
