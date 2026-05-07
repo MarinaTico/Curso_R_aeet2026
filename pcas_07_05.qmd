@@ -185,3 +185,151 @@ plot(herb_mds$points,
      col = as.factor(DayNight),
      pch=16)
 ```
+
+En daynight estan muy mezcladas. No vemos separacion entre dia y noche.
+
+### Constrained methods
+
+(mirar apuntes) Son complicados, pero ahora existe la
+
+#### PERMANOVA
+
+Saber si las distancias entre todos los casos se explican por los habitats, el dia noche o otras variables continuas
+
+Poner datos a eso que visualizamos.
+
+Descopone la varianza enttre grupos de la varianza dentro del grupo. Mediante permutaciones: mi patron es un patron ecologico o es simplemente compatible a algo que veria si no tubiese estructura.
+
+Para ver si la variable que nos interesa estructura los datos o no.
+
+La variable respuesta es una matriz de similaridades. X es un vector que se aplica a las filas.
+
+```{r}
+# Test hypothesis ----
+permanovaDN <- adonis2(formula = Herb_community ~ DayNight, data= herbivores,
+        method = "bray")
+```
+
+```{r}
+permanovaH <- adonis2(formula = Herb_community ~ Habitat, 
+                      data= herbivores,
+        method = "bray")
+permanovaH
+```
+
+method es la distancia que usara, podemos usar la que nos interese mas. Usar la misma del metodos de visualización.
+
+permutation: free hace todos con todos. Sumossqs: error de cada punto a la media estimada. R2 cuanta varianza explica el factor. Vemos que el modelo de H es altamente significativo. 46% de la varianza no se explica por el habitat. Podemos afirmar que el habitat es importante. Podriamos presentar el r2 i el p valor mas el nmds (la visualización). El data no podra indicar la matriz de comunidad! Hay que hacerla a parte (el herb_community).
+
+```{r}
+#Podemos añadir mas variables, como si fuese un lm
+
+permanovaHDN <- adonis2(formula = Herb_community ~ Habitat + DayNight, 
+                      data= herbivores,
+        method = "bray",
+        by = "terms")
+permanovaHDN
+```
+
+Casi todo lo que hacemos con analisis discriminantes podemos usar nmds y permanovas, pero los analisis discriminantes tienen su propio test de significancia, que estaria bien buscar.
+
+el by =terms te permite mantener el efecto del habitat y el del daynight. Daynight no explica casi variabilidad.
+
+puedes constreñir las comparaciones dentro. Permutando:
+
+en este ejempolo permutamos el day i el naight pero individualmente cada uno dentro de el mismo habitat:
+
+```{r}
+permanovaHDNst <- adonis2(formula = Herb_community ~ Habitat, 
+                          strata = DayNight, 
+                          data= herbivores, 
+                          method = "bray", 
+                          by = "terms")
+permanovaHDNst
+```
+
+Resultado similar, porque sabemos que daynight no tiene efecto. Habitats dentro de noche y dentro de dia. Constriñes donde puede permutar. Esta segunda es mas filosofica e elegante. Cuanto mas compacto mejor. strata es el que llamamos factor random. (se usa poco).
+
+es inetersante ver si entre grupos hay dispersiones diferentes dentro de los grupos! **betadisper**
+
+```{r}
+m_dist <- vegdist(Herb_community, method = "bray")
+b <- betadisper(d = m_dist,
+                group = Habitat)
+anova(b) #parece que no ha diferencias entre grupos respeto a dispersiones 
+
+#trabaja con matrices de distancias y no de abundancias como el resto. adonis mdms las crean ellos, aunque aceptan que se la des directamente. 
+
+boxplot(b)
+#no hay diferencias, los grupos son mas o menos igual de dispersos entre ellos
+#Complementarios con la permanova. 
+```
+
+betadisper puede comparar por pares (TukeyHSD(b)), adonis no.
+
+modelando puedes perder datos de esas especies poco abundantes y raras.
+
+#### New approach to multivariate analysis: 
+
+## GLLVM (dificil, no hay mucho paper)
+
+General Lineal Latent Variables Models
+
+multiples variables en multiples sitios. PCA de variables climatiques igual no es relevante. PCA en funcion de otra variable esta genial usar esto.
+
+Variables latentes: como las PCA, que son inexistentres, es como la suma de mjuchas variables, pero es irreal.
+
+- Linear predictror
+
+- Fixed effects
+
+- Latent variables: coordinadas donde mapear cosas
+
+Utiles para saber como cambian exactamente las especies y otros. No solo saber si cambian.
+
+```{r}
+#gllvm-----
+
+library(gllvm)
+#more flexible:
+fitp <- gllvm(y = Herb_community, family = poisson(), num.lv = 2)
+fitnb <- gllvm(y = Herb_community, family = "negative.binomial", num.lv = 2)
+par(mfrow = c(1,2))
+plot(fitp, which = 2:3)
+plot(fitnb, which = 2:3)
+AIC(fitp)
+AIC(fitnb)
+par(mfrow = c(1,1))
+
+coef(fitnb) #Phi is the overdispersion parameters for model checking.
+confint(fitnb)
+ordiplot.gllvm(fitnb, s.colors = as.numeric(as.factor(Habitat)),
+         symbols = T)
+
+fitnb <- gllvm(y = Herb_community, X = data.frame(Habitat, DayNight), family = "negative.binomial", num.lv = 2) #data.frame: variables que constriñen. intentara atribuir toda la varianza que tiene en estas dos variables y la que no pueda ira en las latents
+par(mfrow = c(1,2))
+plot(fitnb, which = 2:3)
+par(mfrow = c(1,1))
+coef(fitnb)
+
+coefplot.gllvm(fitnb, cex.ylab = 0.7, mar = c(4, 9, 2, 1), mfrow=c(2,3),
+         xlim.list = list(c(-10,10), c(-10,10), c(-10,10), c(-10,10), c(-2,2)))
+```
+
+Ventajas: todo el poder de los glmm en multivariante. Se pueden añadir random factors, podemos tener mixed models con variables poison etc. No estamos constrained a que los datos no se ajusten al modelo. Se puede añadir señal filogenetico (!!!!!!!!!).
+
+num.lv: normalmente 2 para verlo en dos dimensiones
+
+negative.binomial funciona bien cuando tiene muchos 0s.
+
+Grafica: las colas del qq plot se van un poco. Damos por bueno y mejor el de negative ninomial.
+
+Nos informa de las relaciones entre especies, donde hay muchas de estas hay pocas de las otras
+
+Mirar los phi nos informa de que podemos sacar cuando entramos en depurar modelos.
+
+analisis muy completos i grandes.
+
+En el ultimo grafico vemos cada especie su respuesta en cada habitat (afinidad a cada uno de ellos). Se reafirma que no hay afinidad hacia dia o noche. Podemos tener una capa mas de informacion.
+
+## Importante mensaje: antes de un lm consultar residuos
