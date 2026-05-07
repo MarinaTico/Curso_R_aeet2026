@@ -1,0 +1,154 @@
+---
+title: "Bayes - Pakillo"
+author: "Marina Ticó"
+format: html
+editor: visual
+---
+
+Vamos a analizar relacion entre dbh i altura pero con bayesiano
+
+Predictores continuos centrados, creamos una nueva variable donde a cada dbh le resto un diametro modelo de 25 cm. El intercept sera en un arbol diametro 25, mejora la interpretación y la convergencia.
+
+```{r}
+trees <- read.csv('data/trees.csv')
+simple.lm <- lm(height ~ dbh, data = trees)
+trees$dbh.c <- trees$dbh- 25
+
+```
+
+Likelyhood: maxima verosimiltud. Es como funcionan los modelos que hemos visto hasta ahora. Prueva distintos valores del parametro y nos da el que mas probablemente predice los resultados que tenemos.
+
+<https://seeing-theory.brown.edu/bayesian-inference/index.html>
+
+**En uno bayesiano: la info que viene de los datos (el likelyhood), la mezclamos con informacion que tenemos a priori.** Es muy util para integrar informacion que conocemos anteriormente
+
+P(Unknown\|Data)∝P(Data\|Unknown)×P(Unknown)
+
+Posterior∝Likelihood (es lo que nos dicen los datos, el posible lm que hacemos o otro)×Prior
+
+Tiene en cuenta el sample size, mas contundente el dataset, mas tirara del dataset i menos del prior. En datasets muy grandes la prior es poco importante. Es importante en sample sizes más pequeños.
+
+- La prior nos permite integrar información. Te regula las estimaciones basadas en cantidades de datos limitadas.
+
+- Usar bayes es como augmetar tu tamaño muestral.
+
+- La prior tiene que estar muy bien justificada. Si no sabemos tendra que ser laxa. En base de metaanalisis de lo que ya sabemos
+
+- Con datasets muy grandes el efecto de la prior diminuye.
+
+Hay que darle una prior a cada parametro.
+
+```{r}
+library('brms') 
+height.formu <- brmsformula(height ~ dbh.c)
+
+#hay que definir una prior para cada parametro: un intercept, una sigma residual, un pendiente...
+
+get_prior(height.formu, data= trees) #nos da unas prior por defecto, pero HAY QUE PENSARLAS!!!!!!!!!!!!!
+```
+
+Para las **prior** hay que evitar las no-informativas (que son muy amplias). hay que:
+
+- Usar weakly informatives o strongly informatives.
+
+Some tips for setting priors:
+
+• <https://github.com/stan-dev/stan/wiki/Prior-ChoiceRecommendations>
+
+• Priors chapter in The BUGS book
+
+• <https://doi.org/10.1111/oik.05985> Run prior predictive checks (just priors, no data)
+
+Hay que explicar muy bien de donde salen los valores de esta prior.
+
+Hacemos un **prior predictive check**, que nos diga que efecto hay:
+
+<https://distribution-explorer.github.io/>
+
+Hay que entender que es cada parametro antes de definir las prior. (ejemplo si hablo de altrura de personas mi prior seria entre 1m o 2m, no tiene sentido de 2000m a -2000m)
+
+```{r}
+priors <- c( set_prior('normal(30, 10)', class = 'Intercept'), 
+             set_prior('normal(0.5, 0.4)', class = 'b'), 
+             set_prior('normal(0, 5)', class = 'sigma') )
+```
+
+Pensar en el caso de pendientes, si sera negativa o positiva. La desviacion tipica es el segundo numero y el primero es la media. Prior para la sigma (desviacion del residuo),
+
+Muy buen conocimiento del modelo estadistico y de la estructura.
+
+##### Prior predictive chech
+
+Primero corremos el modelo solo con los priors
+
+```{r}
+height.mod <- brm(height.formu, 
+                  data = trees, 
+                  prior = priors, 
+                  sample_prior = 'only')
+pp_check(height.mod, ndraws = 100)
+```
+
+Vemos que las priors estan bastante bien! Ajustamos
+
+```{r}
+summary(height.mod)
+```
+
+```{r}
+plot(height.mod)
+```
+
+```{r}
+height.mod <- brm(height.formu, 
+                  data = trees, 
+                  prior = priors)
+pp_check(height.mod, ndraws= 100)
+# a posteriori, le saco el sample_prior only, asi me ploteara los datos
+```
+
+```{r}
+library(priorsense)
+install.packages("priorsense")
+
+powerscale_plot_dens(height.mod)
+```
+
+*Ejercicio*
+
+```{r}
+#height en funcion del sex
+
+height.formu2 <- brmsformula(height ~ sex)
+
+priors <- c( set_prior('normal(20, 10)', class = 'Intercept'), #intercept altura quan es femella
+             set_prior('normal(-0.2, 2)', class = 'b'), #pendent es el que canvia quan es mascle
+             set_prior('normal(0, 5)', class = 'sigma'))
+
+hist()
+
+#check a priori
+
+height.mod2 <- brm(height.formu2, 
+                  data = trees, 
+                  prior = priors, 
+                  sample_prior = 'only')
+pp_check(height.mod2, ndraws = 100)
+```
+
+```{r}
+summary(height.mod2)
+```
+
+```{r}
+#check posteriori
+
+height.mod2 <- brm(height.formu2, 
+                  data = trees, 
+                  prior = priors)
+pp_check(height.mod2, ndraws = 100)
+```
+
+```{r}
+summary(height.mod2)
+```

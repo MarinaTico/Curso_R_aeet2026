@@ -1,0 +1,109 @@
+---
+title: "Generalized Additive Models"
+format: html
+editor: visual
+---
+
+Relaciones no lineales.
+
+Modelos aditivos.: Usaremos en vez de pendiente un suavizado.
+
+```{r}
+isotopes <- readRDS('datasets/isotope.rds')
+
+library('mgcv') #paquete de referencia para trabajar con GAMs
+
+m <- gam(d15N ~ s(Year), data = isotopes, method = 'REML')
+#en vez de tener una pendiente lineal de año usamos un s (suavizado)
+summary(m)
+```
+
+effective Degrees of Freedom: 1 seria lineal como mas sube mas curbas tiene que suavizar. Podemos decidir que patrones son lineales (i no le ponemos la s delante).
+
+```{r}
+library(visreg)
+visreg(m)
+
+```
+
+La r2 es muy alta porque la curba se ajusta muy bien. Podemos tener problemas de overfitting. El paquete tiene cosas para regular este hecho.
+
+```{r}
+gam.check(m)
+```
+
+modelo gausiano centrado en 0.
+
+```         
+Basis dimension (k) checking results. Low p-value (k-index<1) may indicate that k is too low, especially if edf is close to k'.
+```
+
+Cuando nos dice esto hay que darle mas sinuosidad a la curba
+
+K: es el numero de nudos, puntos donde tendra curba, sera sinuoso
+
+```{r}
+m <- gam(d15N ~ s(Year, k = 15), data = isotopes, method = 'REML') 
+gam.check(m)
+```
+
+Es importante comprobar si hay relacion temporal en los residuos. Hay que ver que no haya sesgos. Todo entorno al 0
+
+```{r}
+testTemporalAutocorrelation(simulateResiduals(m), time=isotopes$Year)
+```
+
+Podemos incluir la autocorrelacion temporal:
+
+Que los datos de los años esten correlacionados: de nivel 1: los de un año para el otro lo estan, pero de dos en dos no por ejemplo.
+
+Si hay cambiarian los resultados
+
+```{r}
+mod <- gamm(d15N ~ s(Year, k = 15), data = isotopes, correlation = corCAR1(form = ~ Year), method = 'REML')
+
+summary(mod)
+```
+
+Ejercico
+
+```{r}
+mort <- read.csv("datasets/UN_GDP_infantmortality.csv")
+head(mort)
+```
+
+```{r}
+glm.mort <- glm(infant.mortality ~ gdp, 
+                data = mort,
+                family = "quasipoisson") #hay sobredispersion
+summary(glm.mort)
+```
+
+comprobaciones
+
+```{r}
+visreg(glm.mort)
+```
+
+Patron regular, es un patron no lineal, hay que hacer un GAM
+
+```{r}
+m <- gam(infant.mortality ~ s(gdp), data = mort, method = 'REML', family = "negbin")
+#bn binomial negativa
+
+gam.check(m)
+```
+
+los gam pueden ser mixtos GAMM
+
+## GAMM
+
+Puedes tener en cuenta efectos random. Interecpts variables para cada individuo.
+
+```{r}
+sgamm <- gam(Reaction ~ s(Days) + s(Subject, bs = ”re”), data = sleepstudy, method = 'REML')
+```
+
+bs: el tipo de efecto random
+
+Noam Ross course!!!! (aprender GAM)
