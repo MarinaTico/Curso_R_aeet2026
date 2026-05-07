@@ -1,0 +1,187 @@
+---
+title: "Analisi Multivariante"
+format: html
+editor: visual
+---
+
+Cuando tenemos muchas variables respuesta que queremos explicar.
+
+# *PCA*
+
+Variables continuas
+
+Cuando tenemos muchas variables y ver como se correlaciones entre ellas (por ejemplo muchas variables climaticas).
+
+Forma bonita de ver la relacion de variables numericas entre ellas
+
+```{r}
+#packages
+library(vegan)
+library(mvabund)
+#install.packages(gllvm)
+library("gllvm")
+```
+
+```{r}
+data("iris")
+ir <- iris[, 1:4] #coje todas las filas pero solo columnas de la 1 a la 4
+
+ir_sp <- iris$Species
+```
+
+```{r}
+pairs(ir)
+cor(ir)
+
+```
+
+Corremos la pca
+
+```{r}
+library(stats)
+??pca
+
+pca <- prcomp(ir, center = T, scale. = T) #mucho mejor que princomp mirando help, mejor
+print(pca)
+summary(pca) #nos fijamos en la proportion of Variance. Hay que ver cuantos nos quedamos, no siempre 2 explican todo
+```
+
+Cuanta de la varianza de los datos explica cada una de las variables. Vemos que en un solo eje se explica mucho.
+
+```{r}
+pca
+#Visualizamos 
+
+biplot(pca) #bastante feo, numeros cada una de las observaciones. Las flechas intentan resumir la carga de cada una de las variables. 
+
+
+```
+
+PCA se recomienda centrar las variables. sera mas comparable.
+
+Escalarlas: dividir por la desviación estandard. Recomendado. En casos donde las unidades sean muy importantes es recomendado no escalar, para el resto de los casos si.
+
+S: antiguo lenguaje antes de R.
+
+```{r}
+# Para visualizar es mucho mejor el uso de ggbiplot 
+library(devtools)
+install_github("vqv/ggbiplot")
+library(ggbiplot)
+g <- ggbiplot(pca, obs.scale = 1, var.scale = 1,
+              groups = ir_sp, ellipse = TRUE,
+              circle = TRUE)
+g <- g + scale_color_discrete(name = '')
+g <- g + theme(legend.direction = 'horizontal',
+               legend.position = 'top')
+
+g
+```
+
+Petal length y width altamente correlacionados.
+
+El pca1: altamente explicado por el petalo (linias horizontales casi totalmente). El length del sepalo esta correlacionado con el 1, pero un poco en el 2. el width del sepalo es el que mas explica en el 2. Sepalo mucha variacion interespecifica.
+
+Petalos grandes a la derecha pequeños izquierda. Ancho de los sepalos es variable en las especies pero no las diferencia.
+
+Es una forma de visualizar como de correlacionadas estan las variables. El sepalo covaria indepedientemente de como varia el petalo.
+
+Longitud: importancia de la variable en explicar la varianza. Mas corta menos importante. Escalando igualamos. Escalar y centrar!!!
+
+Flechas = loadings
+
+Potente como analisis descriptivo.
+
+Comunicar los resultados!!! Elegir como una de las variables seria la principal, pero teniendo en cuenta las correlaciones que tiene esta con el resto de variables.
+
+Los ejes son imaginarios. Resumen la variabilidad de los datos. Variables latentes.
+
+## NMDS y PERMANOVA (Correspondance analysis)
+
+Principal coordinates analysis : parecido a la PCA (corresondance analysis), no nos metemos ahi)
+
+**Non Metic Multidimentional Studying NMDS**
+
+Ordenar comunidades de diferentes especies. No son variables a mapear directamente. POrque podemos tener datos de presencia ausencia etc. Creamos matrices de disimilaridades.
+
+Útiles para cosas que no son siempre especies!
+
+- Binarias:
+
+  - Jaccard: porcentaje de especies compartidas
+
+  - Sorensen: más peso a las compartidas! Quieres ver las compartidas, si una no esta por dificultad de muestreo le restas peso.
+
+- Quantitativas:
+
+  - Euclidiana: dificil de usar es demasiado simple
+
+  - Bray-Curtis: (0-1): si las especies no estan en ninguna no tienen peso. Las diferencias en especies muy abundantes van a pesar mucho. Ausencias se descartan del calculo.
+
+  - Morisita
+
+  - Morisita-Horn (le gusta mucho):
+
+  - Kulczynski: van a pesar mas las especies raras.
+
+  - Gower: permite variables categoricas: si quieres comparar traits categoricos(vuela o no..). util para alberto?
+
+Libro de numerical ecology! (Krebs)
+
+Probamos
+
+```{r}
+#datos
+
+herb <- read.csv("datasets/Herbivore_specialisation.csv")
+head(herb)
+#datos marinos: formaciones de algas (un habitat cada una), muestrean animales dentro. Dia y noche a mirar si habia diferente. Median la masa de la alga. Apuntaban para cada especie de animal la abundancia.
+```
+
+La mayoria de analisis multivariantes te piden que cada columna sea una especie. Formato de comunidad (cada fila sera una de ellas). Cambiamos el formato: A cambiar en senecio!!!!!!!!! Mirar bien
+
+```{r}
+library(reshape2) #pivotwide funciona bastante parecido
+herbivores <- dcast(data = herb, formula = Habitat +DayNight + Replicate
+                    +Mass ~ species,
+                    fun.aggregate = sum,
+                    value.var = "abundance")
+head(herbivores) #cada especie sera una columna
+```
+
+```{r}
+#simplify objects to use
+Habitat <- herbivores$Habitat
+DayNight <- herbivores$DayNight
+Herb_community <- herbivores[,5:11]
+```
+
+Como se parecen cada una de estas matrizes la una con la otra: matriz de disimilaridades. 0 sera iguales, 1 completamente disimilares. es muy dificil dibujar la matriz en dos dimensiones, pero el nmds, lo intenta con la maxima fideidad y distorsion posible.
+
+El nmds no es un test, simplemente nos permite visualizar los datos.
+
+Primero crea la matriz de distancias y despues estandariza. Puedes crearla tu mismo la matriz.
+
+```{r}
+herb_mds <- metaMDS(comm = Herb_community, 
+                    distance = "bray", #podemos provar con otras distancias(morista                     -horn por ejemplo)
+                    k = 2)
+#se le pueden pedir mas runs, si no te comberge en 50 no comberge. Un estres de menos de 0.2 es bien. si el estres es de 0.3, 0.4 le va a costar plotear... a una mala puedes poner un terecer eje
+
+plot(herb_mds$points, 
+     col = as.factor(Habitat),
+     pch=16)
+```
+
+Todas las metricas de disimilaridad estan muy correlacionadas. Cuando comparten pocas especies igual ir a algo binario.
+
+```{r}
+herb_mds <- metaMDS(comm = Herb_community, 
+                    distance = "bray", #podemos provar con otras distancias(morista                     -horn por ejemplo)
+                    k = 2)
+#se le pueden pedir mas runs, si no te comberge en 50 no comberge. Un estres de menos de 0.2 es bien. si el estres es de 0.3, 0.4 le va a costar plotear... a una mala puedes poner un terecer eje
+
+plot(herb_mds$points, 
+     col = as.factor(DayNight),
+     pch=16)
+```
