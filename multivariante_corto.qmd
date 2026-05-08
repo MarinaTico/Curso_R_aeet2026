@@ -1,0 +1,58 @@
+---
+title: "Analisi Multivariante"
+author: "Marina Ticó"
+format: html
+editor: visual
+---
+
+## Multivariate data
+
+Muchas variables respuesta que queremos entender a la vez.
+
+Ejemplo: species composition per site, genomics data. Entender como todas las especies cambian sus abundancias en funcion de variables ambientales.
+
+*Packages*
+
+- Vegan
+
+- ade4
+
+*Summarizing community data:* Hay muchos indexes de biodiversidad.
+
+- diversity indexes: Riqueza y abundancia hay muchos. Shannon muy en desuso. Riqueza dificil de estimar.
+
+- beta diversity indexes
+
+- rarefaction: dado un esfurzo de muestreo cuantas especies hay ahí.
+
+*Different questions different methods:*
+
+- Clustering
+
+- Mantel test (Procrustes): comparacion de matrices:
+
+- Ordination:
+
+  - PCA
+
+  - Non metrical
+
+## PCA
+
+Unconstrained
+
+Visualización de datos.
+
+Empezamos con las pruebas:
+
+```{r}
+#Load libraries ----
+library(vegan)
+library(mvabund)
+install.packages("gllvm")
+library(gllvm)
+
+#Load data
+
+data("iris")
+```
