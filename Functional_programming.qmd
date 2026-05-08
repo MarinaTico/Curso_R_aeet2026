@@ -1,0 +1,198 @@
+---
+title: "Programación_Nacho"
+format: html
+editor: visual
+---
+
+Codigo eficiente y limpio
+
+Jugamos con modelos nulos para aprender loops y funciones
+
+```{r}
+# a simple null model to asses correlations
+# creamos la data
+
+abundances <- sort(round(runif(n=6, min = 1, max = 13))) #numeros aleatorios con distribución uniform
+abundances
+
+body_size <- sort(runif(n=6, min = 1, max = 9), decreasing = T)
+body_size
+
+plot(abundances, body_size)
+
+#first, mesurmos corrrelacion
+#por defecto te calcula pearson, si es lineal va bien, spearman se adapta bien si no es lineal 
+#.IMPORTANTE DECIR CUAL EN LOS ARTÍCULOS
+
+cor(abundances, body_size) # -0.9
+cor.test(abundances, body_size) #PARA SABER INTERVALOS DE CONFIANZA, P-VALUE ETC
+```
+
+Creación de un dataset de jugete que te permita saber que errores tienes de forma facil. Para testar las funciones.
+
+Muchas veces el mostraria solamente la correlacion, sin p-value.
+
+Trabajar con modelos nulos es util!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Creamos monton de correlaciones a l'azar y vemos si la nuestra entra, se relaciona con estas a l'azar. Modelo nulo: modelo a l'azar con estructura similar a nuestros datos rompiendo la estructura que queremos testar
+
+```{r}
+#MODELO NULO
+
+cor(sample(abundances, size = 6, replace = FALSE),
+    body_size)
+
+#podemos dejar uno fijo (que no cambie sus valores, y otro que si, o a veces los dos que cambien (no es necesario))
+#replace: si volvemos a metre la opcion de seleccion de un numero que ya hemos sacado
+```
+
+Ahora podemos hacer un for loop para ver que valores nos da! Provar muchas veces para ver que valores nos salen mas probables.
+
+```{r}
+#primero guardar el output
+
+cor_dis <- rep(NA, 1000) #esto sera un vector donde estaran los resultados
+#para cada i en el vector de 1:1000
+for (i in 1:1000) {
+  cor_dis[i] <- cor(sample(abundances, 
+                          size = 6, 
+                          replace = FALSE),
+                    body_size)
+}
+
+hist(cor_dis)
+corr <- cor(abundances, body_size)
+abline(v = corr, col = "red")
+library(gplots)
+
+# test p-value
+
+p <- pnorm(q =corr,
+           mean = mean(cor_dis),
+           sd = sd(cor_dis))
+p
+```
+
+How uneven are abundance and distributions? medida tipica: eveness.
+
+**INDICE DE EQUIDAD: shannon/logaritmo del numero de especies**
+
+```{r}
+p <- abundances/sum(abundances) #Proporciones de cada especie
+p
+
+S <- sum(p*log(p)) #Shannon
+S
+
+i_equi <- S/log(length(abundances))
+i_equi
+```
+
+Podemos crear una funcion que la calcule directamente, de esta forma sera reproducible de forma mas facil
+
+```{r}
+#Función para el calculo del indice de evenness
+J <- function(v){
+  p <- v/sum(v)
+  S <- sum(p*log(p))
+  J <- S/log(length(v))
+  J
+}
+```
+
+Primero le damos el input. En nuestro caso uno es suficiente, que es un vector (v).
+
+Despues hay que darle el output!!! La ultima linia!
+
+Prueva:
+
+```{r}
+J(abundances)
+```
+
+Jugamos mas:
+
+```{r}
+eve <- J(abundances)
+#Hacemos otro modelo nulo, si tiene sentido lo que hemos hecho:
+#Necesitamos crear comunidades con el mismo num de especies e individuos
+#podemos usar sample
+
+#null model
+
+n.model <- sample(x = c(1:6),
+                  size = sum(abundances),
+                  replace = TRUE)
+
+#Las especies son las bolas. Queremos crear comunidades de 6 especies, pero de 40 individuos. Tenemos que reemplazar las bolas, porque sino solo habria 6 individuos de 6 especies. Queremos calcular riquezas!!!
+
+n.model
+null.ab <- table(n.model)
+
+#Hago azar
+J(null.ab) #Practicamente no cambia!!!!!!
+```
+
+Ahora forloop que cree modelos nulos y calcule la J
+
+```{r}
+out <- rep(NA, 1000) #esto sera un vector donde estaran los resultados
+#para cada i en el vector de 1:1000
+for (i in 1:1000) {
+  even_dis <- sample(x = c(1:6),
+                  size = sum(abundances),
+                  replace = TRUE)
+  null_abun <- as.vector(table(even_dis))
+  out[i] <- J(null_abun)
+}
+
+hist(out)
+pval <- length(out[which(out < eve)])/length(out)
+pval
+```
+
+Si trabajamos con n pequeñas hay que controlar las propiedades de nuestros indices.
+
+*Función*
+
+```{r}
+
+null <- function(v, plotit = TRUE){ #VALORES POR DEFECTO los especificamos aqui
+  indice <- J(v)
+  y <- rep(NA, 1000) 
+  
+  for (i in 1:1000) {
+    even_dis <- sample(x = c(1:6),
+                  size = sum(v),
+                  replace = TRUE)
+  null_abun <- as.vector(table(even_dis))
+  y[i] <- J(null_abun)
+}
+if(plotit == TRUE){
+  hist(y) 
+}
+pval <- length(y[which(y < indice)])/length(y)
+list(indice, mean(y), pval)
+}
+
+null(abundances, plotit = FALSE)
+```
+
+Cuando trengamos funciones podemos hacer paquetes de r.
+
+### paquete de lapply
+
+Se puede trabajar con ellos cuando los loops que queremos hacer son muy largos y toman mucho tiempo. Este paquete los alijera.
+
+Para cuando tengamos for loop muy largos
+
+```{r}
+out <- lapply(1:1000, function(i){log(i)})
+unlist(out)
+
+#i es cada uno de los numeros de 1 a 1000
+```
+
+future.apply te permite correr en multiples cores de tu ordenador. plan (multisession)
+
+future.apply, mas facil a veces que el parallel
